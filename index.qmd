@@ -1,6 +1,6 @@
 ---
 title: 251 Midterm Exam
-author: Firstname Lastname
+author: Jo Charbonneau
 date: '2024-03-07'
 execute:
   error: false
@@ -17,12 +17,18 @@ The raw CSV data is available at https://raw.githubusercontent.com/rfordatascien
 
 ```{r r-setup}
 # load any R packages you use in this chunk
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(stringr)
 
 ```
 
 ```{python py-setup}
 # load any python packages you use in this chunk
-
+import pandas as pd
+import matplotlib as plt
+import re
 ```
 
 # Data Input - Polling Places
@@ -42,16 +48,16 @@ election_date,state,county_name,jurisdiction,jurisdiction_type,precinct_id,preci
 ```
 
 1.  What is the file delimiter? (1 pt)    
-<Delete this and replace with your answer>
+The file delimiter should be a comma. 
 
 2.  What is the header? (1 pt)    
-<Delete this and replace with your answer>
+In the context of the TidyTuesday file, the header would be the the labels like election_date, state, etc. 
 
 3.  How many columns will the data have when it is read in using R or Python? (1 pt)    
-<Delete this and replace with your answer>
+The data should have 15 columns when read in. 
 
 4.  How is the data stored differently in the address field compared to the name field (1 pt), and why is this different handling necessary (1 pt)?    
-<Delete this and replace with your answer>
+The name field contains only strings, while there are values in the address field that are numbers. This would be necessary because they are representing different types of information. 
 
 ## Reading the Data
 
@@ -60,10 +66,12 @@ Read in the data in R (5 pts) and in python (5 pts).
 Make sure to load any packages which are necessary to run your code in the setup chunks at the beginning of the document.
 
 ```{r r-read-data}
+tidy_tuesday <- read.csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-01-16/polling_places.csv')
 
 ```
 
 ```{python py-read-data}
+tidy_tuesday = pd.read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-01-16/polling_places.csv')
 
 ```
 
@@ -71,15 +79,27 @@ Make sure to load any packages which are necessary to run your code in the setup
 
 Using any method you choose from either language, fill in the following table.
 
-Language used: <Fill in>
+Language used: R
 
 Make sure your terms match the language you're using and the code you provided above. If you use code to get these values (which is probably a good idea), please use the code chunks provided here:
 
 ```{r r-data-summary-code}
 
-```
+data_type <- sapply(tidy_tuesday, class) #put data into a matrix
 
-```{python py-data-summary-code}
+missing_values <- sapply(tidy_tuesday, function(x) sum(is.na(x))) #get the number of NA values 
+
+unique_values <- sapply(tidy_tuesday, function(x) length(unique(x))) #find the number of unique values
+
+unique_values <- unique_values %>%
+  na.omit() #making sure to omit the NA values so they don't count towards the unique_values
+
+tidy_tuesday_df <- data.frame(
+  Column_Name = names(tidy_tuesday),
+  Data_Type = data_type,
+  Missing_Values = missing_values,
+  Unique_Values = unique_values
+)
 
 ```
 
@@ -111,7 +131,7 @@ When computing the number of unique values, exclude missing values.
 
 For this part of the exam, you'll use your student ID to get the state you'll be working with. 
 ```{r student-id-state-assign}
-my_nuid <- 96582245 # Change this value to your NUID
+my_nuid <- 03876088 
 state_ids <- readRDS("state-ids.RDS")
 my_state <- state_ids$state[my_nuid%%37]
 print(my_state)
@@ -124,6 +144,11 @@ Your end goal is to get a plot of the number of available polling places in each
 
 Write out the steps (in plain language) required to get from the polling place data provided [here](https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-01-16/polling_places.csv) to the data you need to create your plot.
 Make sure to remove polling places which do not make sense - e.g. those with an address consisting of just the state name, or those named "DO NOT USE". 
+(i) filter the rest of the states out, making sure there is only data for connecticut 
+(ii) filter out any values with addresses that are nonsensical 
+(iii) ensure that each jursdiction is grouped uniquely 
+(iv) get the count of polls
+
 
 For each step, identify the data manipulation verb you will use, and any variables you will pass in as arguments. 
 Fill in the following table when you are finished. 
@@ -131,11 +156,32 @@ Add new rows by moving to a new line, and separate each cell in the table with `
 
 Step # | Verb | Arguments
 --- | --- | ---
- 1 | ... | ... <!-- replace this line -->
-
+ 1 | filter() | state == CT
+ 2 | filter () | filter out nonsensical names with grepl() and !=
+ 3 | as.Date | election_date
+ 4 | group_by()| election_date & jurisdiction
+ 5 | summarise()| create new variable for the polling place counts
 
 ## Code
 (10 pts)
+
+```{r}
+state_data <- read.csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-01-16/polling_places.csv')
+
+ct <- state_data %>%
+  filter(state_data$state == 'CT') #filtered out data just for connecticut
+
+ct <- ct %>%
+  filter(!grepl('^Connecticut$',address, ignore.case = TRUE) &
+           name != 'DO NOT USE') #filtered out any possible nonsensical address names
+
+ct$election_date <- as.Date(ct$election_date)
+
+ct <- ct %>% 
+  group_by(election_date, jurisdiction) %>%
+  summarise(total_polls = n(), .groups = 'drop') #found the count of total polling places and used the .groups = 'drop' to avoid issues
+
+```
 
 Write code in R or python to execute the steps you outlined above.
 
@@ -145,15 +191,14 @@ Write code in R or python to execute the steps you outlined above.
 Use the grammar of graphics to identify the components of the chart here, which provides the data for Wisconsin.
 ![Wisconsin counties where the number of polling places changed, 2012-2020](wisconsin-example.jpg){width="50%"}
 
-- geom: 
+- geom: line
 - aesthetics: (list at least 3)
-
-  - 
-  - 
-  - 
+  - group = jurisdiction
+  - labs: title = Wisconsin POlling Place Changes
+  - x = election date, y = Number of Polling places per county 
 - coordinate system: 
-- y axis scale: 
-- x axis scale: 
+- y axis scale: discrete - you cannot have half of a polling place
+- x axis scale: discrete - the years only range from 2014, 2016, 2018, and 2020
 
 
 ## Chart
@@ -164,12 +209,25 @@ Make sure your axes are labeled (5 pts) and your chart has a title (5 pts).
 Include your plot in this document and make sure you have a figure caption that describes what someone should notice in the chart (5 pts)
 You may do this either by modifying the chunk options or by using `include=F` and manually including the picture with a caption.
 
+```{r}
+ct_plot <- ggplot(ct, aes(x = election_date, y = total_polls, group = jurisdiction)) +
+  geom_line() +
+  labs(
+    title = 'Connecticut Polling Place Changes',
+    x = 'Date',
+    y = 'Number of Polling Places per County'
+  )
+
+ct_plot
+
+```
 ## Modifications
 
 Evaluate the chart you created for comprehensibility and accessibility. (1 pt)
+I would say the chart is pretty readable and distinctive, as there are no colors to worry about and the lines are clear. This also appears to be pretty easily comprehensible, as the x and y axes are clear in what they indicate. 
 
 What modifications might you add to this chart to make it clearer and more understandable? (2 pts)
-
+In theory, I would maybe like to choose color by jurisdiction so it could easily be read which jurisdiction is each line. However, unless the chart was larger and more spread apart, that would make certain colors pretty hard to distinguish and difficult for those who have trouble seeing color. I would say that for the most part, I would expand the chart in such a way that each line is a bit easier to distinguish. 
 
 
 # Data Processing
@@ -195,6 +253,10 @@ COMMUNITY CENTER, 1168 HWY 84, SILAS, AL 36919
 ```
 
 Write out the steps your function will need to accomplish in plain language.
+(i) split the address into the individual components 
+(ii) create variables for each component originally storing a null value (NA/0?)
+(iii) assign the components to their variables
+(iv) keep in mind indexing (python starts w 0, r with 1) and find a way so that the result will yield consistently across all addresses
 
 
 ## Function Code - Single Address
@@ -203,14 +265,46 @@ Write out the steps your function will need to accomplish in plain language.
 Write a function, `address_parser`, which can handle a single address and return a data structure containing each piece of the address, with NAs for pieces which are not matched.
 
 (change this chunk to python if you'd prefer to use python over R for this task)
-```{r single-address-parser}
+```{python single-address-parser}
+def address_parser(address):
+  components = address.split(',') #split the address by ,
+  
+  #storing the data in NA values 
+  parsed_address = {
+    'building_number': 'NA',
+    'street': 'NA',
+    'city': 'NA',
+    'state': 'NA',
+    'zip' : 'NA'
+}
+  build_street_comp = components[0].strip().split(' ', 1) #splitting up the beginning of the address in order to accurately obtain the building and street number
+  if len(build_street_comp) >= 1:
+    parsed_address['building_number'] = build_street_comp[0].strip() 
+  if len(build_street_comp) >= 2:
+    parsed_address['street'] = build_street_comp[1].strip() #using this if statement, I was able to both separate out the street and building number, as well as assign their values to the data frame with their given indices
+    
+  if len(components) >= 2:
+    parsed_address['city'] = components[1].strip #obtaining the city, doing so with an if statement figures out if there is a city matching the index or if the value should maintain the NA
+  
+  state_zip_comp = components[-1].strip().split() #using -1 and the strip() and split() functions allowed for the state and zip code to be split up so that I could obtain both individually and match them in the data frame
+  if len(state_zip_comp) >= 1:
+    parsed_address['state'] = state_zip_comp[0].strip()
+  if len(state_zip_comp) >= 2:
+    parsed_address['zip'] = state_zip_comp[1].strip()
+    
+  parsed_address_df = pd.DataFrame(parsed_address, index = [0]) #putting it all together with a data frame, matching the parsed values with their respective variables (started at 0 because python indexing starts at 0)
+  
+  return parsed_address_df
+  
+
+    
 
 ```
 
 
 This chunk will test your function on the addresses provided as examples. 
 (change this chunk to python if you used python above)
-```{r single-address-parser-test, error = T}
+```{python single-address-parser-test, error = T}
 address_parser("Tatitlek, AK 99677")
 address_parser("First Street, Cordova, AK 99574")
 address_parser("105 ICE ST, MENASHA, WI 54952-3223")
@@ -227,16 +321,17 @@ address_parser("COMMUNITY CENTER, 1168 HWY 84, SILAS, AL 36919")
 Write a function, `address_vec`, which can parse a vector of addresses and return a data frame with columns corresponding to each piece of the address.
 
 (change this chunk to python if you'd prefer to use python over R for this task)
-```{r vector-address-parser}
-
+```{python vector-address-parser}
+def address_vec(addresses):
+  parsed_df = pd.DataFrame(columns = ['building_number','street','city','state','zip']) #creating a data frame that the values can then be applied to
+  for address in addresses:
+    parsed_df = pd.concat([parsed_df, address_parser(address)], ignore_index = True) #used concat in order to create a data frame
+  return parsed_df
+ 
 ```
 
 
 This chunk will test your function on the addresses provided as examples. Delete whichever chunk corresponds to the language you didn't use. 
-```{r r-vector-address-parser-test, error = T}
-test_vec <- c("Tatitlek, AK 99677", "First Street, Cordova, AK 99574", "105 ICE ST, MENASHA, WI 54952-3223", "1025 W 5TH AVE, OSHKOSH, WI 54902", "1702 COUNTY ROAD 40 W, PRATTVILLE, AL 36067", "5281 HIGHWAY 29, CORINTH VFD (PEROTE STATION), BANKS, AL 36005", "713 W. MOUNTAIN AVENUE, JACKSONVILLE, AL 36265", "COMMUNITY CENTER, 1168 HWY 84, SILAS, AL 36919")
-address_vec(test_vec)
-```
 
 ```{python py-vector-address-parser-test, error = T}
 test_vec = ["Tatitlek, AK 99677", "First Street, Cordova, AK 99574", "105 ICE ST, MENASHA, WI 54952-3223", "1025 W 5TH AVE, OSHKOSH, WI 54902", "1702 COUNTY ROAD 40 W, PRATTVILLE, AL 36067", "5281 HIGHWAY 29, CORINTH VFD (PEROTE STATION), BANKS, AL 36005", "713 W. MOUNTAIN AVENUE, JACKSONVILLE, AL 36265", "COMMUNITY CENTER, 1168 HWY 84, SILAS, AL 36919"]
@@ -248,8 +343,22 @@ address_vec(test_vec)
 Use your function to parse a vector of the unique polling place addresses in your state, creating a data table of address components for your letters.
 (5 pts)
 
-```{r r-function-eval}
+```{python python-function-eval}
+
+state_data = pd.read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-01-16/polling_places.csv')
+
+#Clean out the rest of the state data, ensuring that only CT is accounted for here (and dropping all NA values)
+ct_polling_addresses = state_data[state_data['state'] == 'CT']
+ct_polling_addresses = ct_polling_addresses.dropna(subset=['address']) 
+
+#We want unique addresses in order to condense our data frame and not make it insanely long
+ct_unique = ct_polling_addresses['address'].unique()
+
+#Print using our address_vec function
+ct_address = address_vec(ct_unique)
+ct_address
 
 ```
 
 Where did your function have issues, if it did? (5 pts)
+At first my function has a lot of issues with indexing, where it was running smoothly but didn't have things in the correct place. That's part of the reason I switched to python, as I have found in the past I have an easier time working with indexes while using python, as I see it as more straight forward (an incredibly rare win for python). I ended up having some issues with shorter addresses and things not being in the correct position still (such as the street name ending up in building_number). I'm not 100% sure how I would fix this, but I might try to subset the first part of the address further to see if that would have any effect. 
